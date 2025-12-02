@@ -20,7 +20,7 @@
       background: #111827;
       padding: 24px;
       border-radius: 16px;
-      max-width: 600px;
+      max-width: 700px;
       width: 100%;
       box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
@@ -53,15 +53,28 @@
 
     table {
       width: 100%;
-      margin-top: 20px;
+      margin-top: 16px;
       border-collapse: collapse;
       display: none;
+      font-size: 0.9rem;
     }
     th, td {
       padding: 6px;
       border-bottom: 1px solid #374151;
+      text-align: left;
     }
 
+    .section-title {
+      margin-top: 20px;
+      font-weight: bold;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 4px;
+    }
+
+    .small-info {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
   </style>
 </head>
 <body>
@@ -69,6 +82,7 @@
 <div class="card">
   <h1>Pronostics Miss France 👑</h1>
 
+  <!-- FORMULAIRE -->
   <form id="form">
     <label>Ton nom *</label>
     <input id="name" required />
@@ -81,6 +95,7 @@
 
     <label>Choisis ta Miss *</label>
     <select id="miss" required>
+      <option value="">-- Choisis --</option>
       <option>Miss Aquitaine</option>
       <option>Miss Auvergne</option>
       <option>Miss Bourgogne</option>
@@ -109,20 +124,76 @@
       <option>Miss Rhône-Alpes</option>
       <option>Miss Roussillon</option>
       <option>Miss Tahiti</option>
-      <!-- tu peux en rajouter -->
     </select>
 
-    <button style="background:#22c55e; color:white;">Valider</button>
+    <button style="background:#22c55e; color:white;">Valider mon pronostic</button>
   </form>
 
-  <button id="load" style="background:#1e40af; color:white;">📊 Voir les votes</button>
+  <button id="load" style="background:#1e40af; color:white;">📊 Voir les pronostics</button>
+
+  <p class="small-info">
+    ⚠️ Les mises se font en vrai. Ici, on enregistre juste les pronostics et on calcule les gains à la fin.
+  </p>
 
   <p id="msg"></p>
 
-  <table id="table">
+  <!-- TABLEAU DES PRONOS -->
+  <h2 class="section-title">Liste des pronostics</h2>
+  <table id="table-votes">
     <thead>
       <tr>
-        <th>Nom</th><th>Email</th><th>Mise</th><th>Choix</th>
+        <th>Nom</th><th>Email</th><th>Mise (€)</th><th>Miss choisie</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- CALCUL DES GAINS -->
+  <h2 class="section-title">Calcul des gains</h2>
+
+  <label>Miss gagnante réelle</label>
+  <select id="winner">
+    <option value="">-- Choisis la vraie gagnante --</option>
+    <option>Miss Aquitaine</option>
+    <option>Miss Auvergne</option>
+    <option>Miss Bourgogne</option>
+    <option>Miss Bretagne</option>
+    <option>Miss Centre-Val-de-Loire</option>
+    <option>Miss Champagne-Ardenne</option>
+    <option>Miss Corse</option>
+    <option>Miss Côte d'Azur</option>
+    <option>Miss Franche-Comté</option>
+    <option>Miss Guadeloupe</option>
+    <option>Miss Guyane</option>
+    <option>Miss Île-de-France</option>
+    <option>Miss Languedoc</option>
+    <option>Miss Limousin</option>
+    <option>Miss Lorraine</option>
+    <option>Miss Martinique</option>
+    <option>Miss Mayotte</option>
+    <option>Miss Midi-Pyrénées</option>
+    <option>Miss Nord-Pas-de-Calais</option>
+    <option>Miss Normandie</option>
+    <option>Miss Pays de la Loire</option>
+    <option>Miss Picardie</option>
+    <option>Miss Poitou-Charentes</option>
+    <option>Miss Provence</option>
+    <option>Miss Réunion</option>
+    <option>Miss Rhône-Alpes</option>
+    <option>Miss Roussillon</option>
+    <option>Miss Tahiti</option>
+  </select>
+
+  <button id="calc" style="background:#facc15; color:#111827; margin-top:8px;">💰 Calculer les gains</button>
+
+  <table id="table-gains">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Email</th>
+        <th>Mise (€)</th>
+        <th>Miss choisie</th>
+        <th>Gain (€)</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -131,17 +202,15 @@
 </div>
 
 <script type="module">
-
-  /* -----------------------------------------
-     🔥 1) IMPORT FIREBASE
-  ----------------------------------------- */
+  /* -----------------------------
+     1) IMPORT FIREBASE
+  ----------------------------- */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  
-  /* -----------------------------------------
-     🚀 2) TA CONFIG FIREBASE (COLLE TA VERSION ICI)
-  ----------------------------------------- */
+  /* -----------------------------
+     2) CONFIG FIREBASE (TA CONFIG)
+  ----------------------------- */
   const firebaseConfig = {
     apiKey: "AIzaSyClQ6YnEk_o3f80GRzQI3mJZD5oMC7-D1I",
     authDomain: "miss2-50355.firebaseapp.com",
@@ -151,74 +220,149 @@
     appId: "1:1039743844536:web:b9f2f8e9d1b4112beb744d"
   };
 
-
-  /* -----------------------------------------
-     🎯 3) CONNECTION FIRESTORE
-  ----------------------------------------- */
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const bets = collection(db, "votes");
+  const betsCol = collection(db, "votes"); // collection "votes" dans Firestore
 
   const form = document.getElementById("form");
   const msg = document.getElementById("msg");
 
-  /* -----------------------------------------
-     📝 4) ENREGISTRER UN PARI
-  ----------------------------------------- */
+  const tableVotes = document.getElementById("table-votes");
+  const tbodyVotes = tableVotes.querySelector("tbody");
+
+  const tableGains = document.getElementById("table-gains");
+  const tbodyGains = tableGains.querySelector("tbody");
+
+  /* -----------------------------
+     3) ENREGISTRER UN PARI
+  ----------------------------- */
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const name = document.getElementById("name").value.trim();
     const email = document.getElementById("email").value.trim();
-    const mise = +document.getElementById("mise").value;
+    const mise = Number(document.getElementById("mise").value);
     const miss = document.getElementById("miss").value;
 
-    if(!name || !email || !mise || !miss){
-      msg.textContent = "⚠️ Remplis tout !";
+    if (!name || !email || !mise || !miss) {
+      msg.textContent = "⚠️ Remplis tous les champs.";
       msg.className = "error";
       return;
     }
 
     msg.textContent = "⏳ Enregistrement...";
+    msg.className = "";
 
-    await addDoc(bets, { name, email, mise, miss });
-
-    msg.textContent = "✔️ Enregistré !";
-    msg.className = "success";
-    form.reset();
+    try {
+      await addDoc(betsCol, { name, email, mise, miss });
+      msg.textContent = "✔️ Pronostic enregistré !";
+      msg.className = "success";
+      form.reset();
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur Firebase : " + err.message;
+      msg.className = "error";
+    }
   });
 
-
-  /* -----------------------------------------
-     📌 5) AFFICHER LES VOTES
-  ----------------------------------------- */
+  /* -----------------------------
+     4) AFFICHER LES PRONOS
+  ----------------------------- */
   document.getElementById("load").addEventListener("click", async () => {
-    msg.textContent = "⏳ Chargement...";
-    
-    const table = document.getElementById("table");
-    const tbody = table.querySelector("tbody");
+    msg.textContent = "⏳ Chargement des pronostics...";
+    msg.className = "";
 
-    tbody.innerHTML = "";
+    tbodyVotes.innerHTML = "";
 
-    const snap = await getDocs(bets);
-    snap.forEach(doc => {
-      const v = doc.data();
-      tbody.innerHTML += `
-        <tr>
-          <td>${v.name}</td>
-          <td>${v.email}</td>
-          <td>${v.mise}€</td>
-          <td>${v.miss}</td>
-        </tr>
-      `;
-    });
-
-    table.style.display = "table";
-    msg.textContent = "📌 Votes chargés.";
-    msg.className = "success";
+    try {
+      const snap = await getDocs(betsCol);
+      snap.forEach(doc => {
+        const v = doc.data();
+        tbodyVotes.innerHTML += `
+          <tr>
+            <td>${v.name}</td>
+            <td>${v.email}</td>
+            <td>${v.mise}</td>
+            <td>${v.miss}</td>
+          </tr>
+        `;
+      });
+      tableVotes.style.display = "table";
+      msg.textContent = "✔️ Pronostics chargés.";
+      msg.className = "success";
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur en récupérant les pronostics : " + err.message;
+      msg.className = "error";
+    }
   });
 
+  /* -----------------------------
+     5) CALCUL DES GAINS
+  ----------------------------- */
+  document.getElementById("calc").addEventListener("click", async () => {
+    const winner = document.getElementById("winner").value;
+    if (!winner) {
+      msg.textContent = "⚠️ Choisis d'abord la vraie Miss gagnante.";
+      msg.className = "error";
+      return;
+    }
+
+    msg.textContent = "⏳ Calcul des gains...";
+    msg.className = "";
+
+    try {
+      const snap = await getDocs(betsCol);
+      const votes = [];
+      snap.forEach(doc => votes.push(doc.data()));
+
+      if (votes.length === 0) {
+        msg.textContent = "❌ Aucun pronostic trouvé.";
+        msg.className = "error";
+        return;
+      }
+
+      const totalPot = votes.reduce((sum, v) => sum + (v.mise ?? 0), 0);
+      const totalOnWinner = votes
+        .filter(v => v.miss === winner)
+        .reduce((sum, v) => sum + (v.mise ?? 0), 0);
+
+      tbodyGains.innerHTML = "";
+
+      if (totalOnWinner === 0) {
+        msg.textContent = "😅 Personne n'avait la bonne Miss... Le pot est pour l'orga !";
+        msg.className = "success";
+        tableGains.style.display = "none";
+        return;
+      }
+
+      votes.forEach(v => {
+        let gain = 0;
+        if (v.miss === winner) {
+          gain = (v.mise * totalPot) / totalOnWinner;
+        }
+        tbodyGains.innerHTML += `
+          <tr>
+            <td>${v.name}</td>
+            <td>${v.email}</td>
+            <td>${v.mise}</td>
+            <td>${v.miss}</td>
+            <td>${gain.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+
+      tableGains.style.display = "table";
+      msg.textContent = `💰 Pot total : ${totalPot.toFixed(2)} € – Mises sur la gagnante : ${totalOnWinner.toFixed(2)} €`;
+      msg.className = "success";
+
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur en calculant les gains : " + err.message;
+      msg.className = "error";
+    }
+  });
 </script>
+
 </body>
 </html>
-

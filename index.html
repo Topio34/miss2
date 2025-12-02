@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  
   <meta charset="UTF-8">
   <title>Pronostics Miss France - Prépa</title>
   <style>
@@ -19,7 +18,7 @@
       background: #111827;
       padding: 24px;
       border-radius: 16px;
-      max-width: 500px;
+      max-width: 600px;
       width: 100%;
       box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
@@ -62,11 +61,19 @@
       border-bottom: 1px solid #374151;
       padding: 6px;
       text-align: left;
+      font-size: 0.9rem;
     }
     .info {
       font-size: 0.8rem;
       color: #9ca3af;
       margin-top: 6px;
+    }
+    .section-title {
+      margin-top: 24px;
+      font-weight: bold;
+      font-size: 1rem;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 4px;
     }
   </style>
 </head>
@@ -74,14 +81,18 @@
 
 <div class="card">
     <h1>Pronostics Miss France</h1>
-    <p>Chaque personne met 1 € en vrai. Ici, on enregistre juste les pronostics 👀</p>
+    <p>On enregistre les pronostics et les mises pour répartir le pot à la fin 👀</p>
 
+    <!-- FORMULAIRE DE PRONOSTIC -->
     <form id="form-prono">
       <label for="name">Ton prénom / pseudo</label>
       <input type="text" id="name" required>
 
       <label for="email">Ton adresse mail</label>
       <input type="email" id="email" required>
+
+      <label for="mise">Ta mise (en €)</label>
+      <input type="number" id="mise" min="1" step="0.5" value="1" required>
 
       <label for="miss">Ta gagnante</label>
       <select id="miss" required>
@@ -122,49 +133,109 @@
     <button id="show-results" style="background:#1e40af; color:white; margin-top:10px;">📊 Voir les pronostics</button>
 
     <p class="info">
-      ⚠️ Aucun paiement sur ce site, c'est juste pour s'amuser et garder les pronostics.
+      ⚠️ Les mises se font en vrai, ici on garde juste une trace et on calcule les gains.
     </p>
 
     <div id="message"></div>
 
+    <!-- TABLEAU DES PRONOS -->
+    <h2 class="section-title">Liste des pronostics</h2>
     <table id="result-table">
       <thead>
         <tr>
           <th>Nom</th>
           <th>Email</th>
-          <th>Choix</th>
+          <th>Mise (€)</th>
+          <th>Miss choisie</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+
+    <!-- CALCUL DES GAINS -->
+    <h2 class="section-title">Calcul des gains</h2>
+
+    <label for="winner-select">Miss gagnante réelle</label>
+    <select id="winner-select">
+      <option value="">-- Choisis la vraie Miss gagnante --</option>
+      <option>Miss Aquitaine</option>
+      <option>Miss Auvergne</option>
+      <option>Miss Bourgogne</option>
+      <option>Miss Bretagne</option>
+      <option>Miss Centre-Val-de-Loire</option>
+      <option>Miss Champagne-Ardenne</option>
+      <option>Miss Corse</option>
+      <option>Miss Côte d'Azur</option>
+      <option>Miss Franche-Comté</option>
+      <option>Miss Guadeloupe</option>
+      <option>Miss Guyane</option>
+      <option>Miss Île-de-France</option>
+      <option>Miss Languedoc</option>
+      <option>Miss Limousin</option>
+      <option>Miss Lorraine</option>
+      <option>Miss Martinique</option>
+      <option>Miss Mayotte</option>
+      <option>Miss Midi-Pyrénées</option>
+      <option>Miss Nord-Pas-de-Calais</option>
+      <option>Miss Normandie</option>
+      <option>Miss Pays de la Loire</option>
+      <option>Miss Picardie</option>
+      <option>Miss Poitou-Charentes</option>
+      <option>Miss Provence</option>
+      <option>Miss Réunion</option>
+      <option>Miss Rhône-Alpes</option>
+      <option>Miss Roussillon</option>
+      <option>Miss Tahiti</option>
+    </select>
+
+    <button id="calc-gains" style="background:#facc15; color:#111827; margin-top:10px;">💰 Calculer les gains</button>
+
+    <table id="gains-table">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Email</th>
+          <th>Mise (€)</th>
+          <th>Miss choisie</th>
+          <th>Gain (€)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
 </div>
 
 <script>
-
   const form = document.getElementById("form-prono");
   const msg = document.getElementById("message");
 
+  // Enregistrement d'UN pari (on autorise plusieurs paris par email)
   form.addEventListener("submit", function(e){
       e.preventDefault();
 
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value.toLowerCase();
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.toLowerCase().trim();
+      const mise = parseFloat(document.getElementById("mise").value);
       const miss = document.getElementById("miss").value;
 
-      if(localStorage.getItem(email)) {
-        msg.innerHTML = "❌ Tu as déjà voté !";
+      if(!name || !email || !miss || isNaN(mise) || mise <= 0){
+        msg.innerHTML = "❌ Merci de remplir correctement tous les champs.";
         msg.className = "error";
         return;
       }
 
-      localStorage.setItem(email, JSON.stringify({name, miss}));
+      // identifiant unique pour chaque pari
+      const betId = "bet_" + Date.now() + "_" + Math.random().toString(16).slice(2);
 
-      msg.innerHTML = "✔️ Vote enregistré ! Bonne chance 🍀";
+      localStorage.setItem(betId, JSON.stringify({name, email, miss, mise}));
+
+      msg.innerHTML = "✔️ Pronostic enregistré ! Tu peux en ajouter d'autres si tu veux.";
       msg.className = "success";
 
       form.reset();
   });
 
+  // Affichage des pronostics
   const btnResults = document.getElementById("show-results");
   const table = document.getElementById("result-table");
   const tbody = table.querySelector("tbody");
@@ -175,11 +246,13 @@
     Object.keys(localStorage).forEach(key => {
         try {
             const vote = JSON.parse(localStorage.getItem(key));
-            if(vote && vote.name && vote.miss) {
+            if(vote && vote.name && vote.miss){
+                const mise = vote.mise ?? 0;
                 tbody.innerHTML += `
                     <tr>
                         <td>${vote.name}</td>
-                        <td>${key}</td>
+                        <td>${vote.email}</td>
+                        <td>${mise}</td>
                         <td>${vote.miss}</td>
                     </tr>
                 `;
@@ -190,8 +263,76 @@
     table.style.display = "table";
   });
 
+  // Calcul des gains
+  const btnCalc = document.getElementById("calc-gains");
+  const winnerSelect = document.getElementById("winner-select");
+  const gainsTable = document.getElementById("gains-table");
+  const gainsBody = gainsTable.querySelector("tbody");
+
+  btnCalc.addEventListener("click", () => {
+    const winner = winnerSelect.value;
+    if(!winner){
+      msg.innerHTML = "❌ Sélectionne la vraie Miss gagnante pour calculer les gains.";
+      msg.className = "error";
+      return;
+    }
+
+    // Récupérer tous les pronostics
+    const votes = [];
+    Object.keys(localStorage).forEach(key => {
+      try {
+        const vote = JSON.parse(localStorage.getItem(key));
+        if(vote && vote.name && vote.miss){
+          votes.push(vote); // {name, email, miss, mise}
+        }
+      } catch(e){}
+    });
+
+    if(votes.length === 0){
+      msg.innerHTML = "❌ Aucun pronostic trouvé.";
+      msg.className = "error";
+      return;
+    }
+
+    // Pot total
+    const totalPot = votes.reduce((sum, v) => sum + (v.mise ?? 0), 0);
+
+    // Total des mises sur la bonne miss
+    const totalSurGagnante = votes
+      .filter(v => v.miss === winner)
+      .reduce((sum, v) => sum + (v.mise ?? 0), 0);
+
+    gainsBody.innerHTML = "";
+
+    if(totalSurGagnante === 0){
+      msg.innerHTML = "😅 Personne n'avait la bonne Miss... Le pot est pour l'orga !";
+      msg.className = "success";
+      gainsTable.style.display = "none";
+      return;
+    }
+
+    // Calcul du gain pour chaque pari gagnant
+    votes.forEach(v => {
+      let gain = 0;
+      if(v.miss === winner){
+        gain = (v.mise * totalPot) / totalSurGagnante;
+      }
+      gainsBody.innerHTML += `
+        <tr>
+          <td>${v.name}</td>
+          <td>${v.email}</td>
+          <td>${v.mise}</td>
+          <td>${v.miss}</td>
+          <td>${gain > 0 ? gain.toFixed(2) : "0.00"}</td>
+        </tr>
+      `;
+    });
+
+    gainsTable.style.display = "table";
+    msg.innerHTML = `💰 Pot total : ${totalPot.toFixed(2)} € – Mises sur la gagnante : ${totalSurGagnante.toFixed(2)} €`;
+    msg.className = "success";
+  });
 </script>
 
 </body>
 </html>
-

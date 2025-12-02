@@ -205,133 +205,154 @@
 
 </div>
 
-<script>
+<!-- SCRIPT AVEC FIREBASE -->
+<script type="module">
+  // 1) Import Firebase depuis les CDN
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// CONFIG FIREBASE (VERSION POUR TON SITE)
+const firebaseConfig = {
+  apiKey: "AIzaSyClQ6YnEk_o3f80GRzQI3mJZD5oMC7-D1I",
+  authDomain: "miss2-50355.firebaseapp.com",
+  projectId: "miss2-50355",
+  storageBucket: "miss2-50355.firebasestorage.app",
+  messagingSenderId: "1039743844536",
+  appId: "1:1039743844536:web:b9f2f8e9d1b4112beb744d",
+  measurementId: "G-0TDQ6VTWDE"
+};
+
+
+  // 3) Initialisation Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const betsCol = collection(db, "bets"); // collection "bets"
+
   const form = document.getElementById("form-prono");
   const msg = document.getElementById("message");
 
-  // Enregistrement d'UN pari (on autorise plusieurs paris par email)
-  form.addEventListener("submit", function(e){
-      e.preventDefault();
+  // 4) Enregistrer un pari dans Firestore
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.toLowerCase().trim();
-      const mise = parseFloat(document.getElementById("mise").value);
-      const miss = document.getElementById("miss").value;
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.toLowerCase().trim();
+    const mise = parseFloat(document.getElementById("mise").value);
+    const miss = document.getElementById("miss").value;
 
-      if(!name || !email || !miss || isNaN(mise) || mise <= 0){
-        msg.innerHTML = "❌ Merci de remplir correctement tous les champs.";
-        msg.className = "error";
-        return;
-      }
+    if(!name || !email || !miss || isNaN(mise) || mise <= 0){
+      msg.textContent = "❌ Merci de remplir correctement tous les champs.";
+      msg.className = "error";
+      return;
+    }
 
-      // identifiant unique pour chaque pari
-      const betId = "bet_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-
-      localStorage.setItem(betId, JSON.stringify({name, email, miss, mise}));
-
-      msg.innerHTML = "✔️ Pronostic enregistré ! Tu peux en ajouter d'autres si tu veux.";
+    try {
+      await addDoc(betsCol, { name, email, mise, miss });
+      msg.textContent = "✔️ Pronostic enregistré !";
       msg.className = "success";
-
       form.reset();
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur en enregistrant le pronostic.";
+      msg.className = "error";
+    }
   });
 
-  // Affichage des pronostics
+  // 5) Afficher tous les pronostics
   const btnResults = document.getElementById("show-results");
   const table = document.getElementById("result-table");
   const tbody = table.querySelector("tbody");
 
-  btnResults.addEventListener("click", () => {
-    tbody.innerHTML = ""; 
+  btnResults.addEventListener("click", async () => {
+    tbody.innerHTML = "";
 
-    Object.keys(localStorage).forEach(key => {
-        try {
-            const vote = JSON.parse(localStorage.getItem(key));
-            if(vote && vote.name && vote.miss){
-                const mise = vote.mise ?? 0;
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${vote.name}</td>
-                        <td>${vote.email}</td>
-                        <td>${mise}</td>
-                        <td>${vote.miss}</td>
-                    </tr>
-                `;
-            }
-        } catch(e){}
-    });
-
-    table.style.display = "table";
+    try {
+      const snapshot = await getDocs(betsCol);
+      snapshot.forEach(doc => {
+        const v = doc.data();
+        tbody.innerHTML += `
+          <tr>
+            <td>${v.name}</td>
+            <td>${v.email}</td>
+            <td>${v.mise}</td>
+            <td>${v.miss}</td>
+          </tr>
+        `;
+      });
+      table.style.display = "table";
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur en récupérant les pronostics.";
+      msg.className = "error";
+    }
   });
 
-  // Calcul des gains
+  // 6) Calcul des gains
   const btnCalc = document.getElementById("calc-gains");
   const winnerSelect = document.getElementById("winner-select");
   const gainsTable = document.getElementById("gains-table");
   const gainsBody = gainsTable.querySelector("tbody");
 
-  btnCalc.addEventListener("click", () => {
+  btnCalc.addEventListener("click", async () => {
     const winner = winnerSelect.value;
     if(!winner){
-      msg.innerHTML = "❌ Sélectionne la vraie Miss gagnante pour calculer les gains.";
+      msg.textContent = "❌ Sélectionne la vraie Miss gagnante pour calculer les gains.";
       msg.className = "error";
       return;
     }
 
-    // Récupérer tous les pronostics
-    const votes = [];
-    Object.keys(localStorage).forEach(key => {
-      try {
-        const vote = JSON.parse(localStorage.getItem(key));
-        if(vote && vote.name && vote.miss){
-          votes.push(vote); // {name, email, miss, mise}
-        }
-      } catch(e){}
-    });
+    try {
+      const snapshot = await getDocs(betsCol);
+      const votes = [];
+      snapshot.forEach(doc => votes.push(doc.data()));
 
-    if(votes.length === 0){
-      msg.innerHTML = "❌ Aucun pronostic trouvé.";
-      msg.className = "error";
-      return;
-    }
-
-    // Pot total
-    const totalPot = votes.reduce((sum, v) => sum + (v.mise ?? 0), 0);
-
-    // Total des mises sur la bonne miss
-    const totalSurGagnante = votes
-      .filter(v => v.miss === winner)
-      .reduce((sum, v) => sum + (v.mise ?? 0), 0);
-
-    gainsBody.innerHTML = "";
-
-    if(totalSurGagnante === 0){
-      msg.innerHTML = "😅 Personne n'avait la bonne Miss... Le pot est pour l'orga !";
-      msg.className = "success";
-      gainsTable.style.display = "none";
-      return;
-    }
-
-    // Calcul du gain pour chaque pari gagnant
-    votes.forEach(v => {
-      let gain = 0;
-      if(v.miss === winner){
-        gain = (v.mise * totalPot) / totalSurGagnante;
+      if(votes.length === 0){
+        msg.textContent = "❌ Aucun pronostic trouvé.";
+        msg.className = "error";
+        return;
       }
-      gainsBody.innerHTML += `
-        <tr>
-          <td>${v.name}</td>
-          <td>${v.email}</td>
-          <td>${v.mise}</td>
-          <td>${v.miss}</td>
-          <td>${gain > 0 ? gain.toFixed(2) : "0.00"}</td>
-        </tr>
-      `;
-    });
 
-    gainsTable.style.display = "table";
-    msg.innerHTML = `💰 Pot total : ${totalPot.toFixed(2)} € – Mises sur la gagnante : ${totalSurGagnante.toFixed(2)} €`;
-    msg.className = "success";
+      const totalPot = votes.reduce((sum, v) => sum + (v.mise ?? 0), 0);
+      const totalSurGagnante = votes
+        .filter(v => v.miss === winner)
+        .reduce((sum, v) => sum + (v.mise ?? 0), 0);
+
+      gainsBody.innerHTML = "";
+
+      if(totalSurGagnante === 0){
+        msg.textContent = "😅 Personne n'avait la bonne Miss... Le pot est pour l'orga !";
+        msg.className = "success";
+        gainsTable.style.display = "none";
+        return;
+      }
+
+      votes.forEach(v => {
+        let gain = 0;
+        if(v.miss === winner){
+          gain = (v.mise * totalPot) / totalSurGagnante;
+        }
+        gainsBody.innerHTML += `
+          <tr>
+            <td>${v.name}</td>
+            <td>${v.email}</td>
+            <td>${v.mise}</td>
+            <td>${v.miss}</td>
+            <td>${gain.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+
+      gainsTable.style.display = "table";
+      msg.textContent = `💰 Pot total : ${totalPot.toFixed(2)} € – Mises sur la gagnante : ${totalSurGagnante.toFixed(2)} €`;
+      msg.className = "success";
+
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ Erreur en calculant les gains.";
+      msg.className = "error";
+    }
   });
+
 </script>
 
 </body>

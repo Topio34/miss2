@@ -364,7 +364,7 @@
   });
 
   // 🔧 Bloquer les mises après une date limite
-const deadline = new Date("2025-12-05");
+const deadline = new Date("");
 if (new Date() > deadline) {
   form.style.display = "none";     // cache le formulaire
   msg.textContent = "⛔ Les pronostics sont clos.";
@@ -375,4 +375,5 @@ if (new Date() > deadline) {
 
 </body>
 </html>
+
 
